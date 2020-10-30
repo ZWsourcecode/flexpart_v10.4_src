@@ -31,4 +31,9 @@ module outg_mod
   real,allocatable, dimension (:) :: sparse_dump_u
   integer,allocatable, dimension (:) :: sparse_dump_i
 
+  ! To print concentration within mixing height, added by ZW
+  ! -------------------- start --------------------
+  real,allocatable, dimension (:,:,:) :: conc_3d
+  real,allocatable, dimension (:,:) :: conc_2d
+  ! -------------------- end --------------------
 end module outg_mod

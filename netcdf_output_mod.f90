@@ -35,7 +35,8 @@ module netcdf_output_mod
                        xpoint1,ypoint1,xpoint2,ypoint2,zpoint1,zpoint2,npart,xmass
   use outg_mod,  only: outheight,oroout,densityoutgrid,factor3d,volume,&
                        wetgrid,wetgridsigma,drygrid,drygridsigma,grid,gridsigma,&
-                       area,arean,volumen, orooutn
+                       area,arean,volumen, orooutn, &
+                       conc_2d, conc_3d ! by ZW
   use par_mod,   only: dep_prec, sp, dp, maxspec, maxreceptor, nclassunc,&
                        unitoutrecept,unitoutreceptppt, nxmax,unittmp
   use com_mod,   only: path,length,ldirect,ibdate,ibtime,iedate,ietime, &
@@ -56,7 +57,8 @@ module netcdf_output_mod
                        itsplit, lsynctime, ctl, ifine, lagespectra, ipin, &
                        ioutputforeachrelease, iflux, mdomainfill, mquasilag, & 
                        nested_output, ipout, surf_only, linit_cond, &
-                       flexversion,mpi_mode,DRYBKDEP,WETBKDEP
+                       flexversion,mpi_mode,DRYBKDEP,WETBKDEP, &
+                       hmix ! by ZW
 
   use mean_mod
 
@@ -84,6 +86,8 @@ module netcdf_output_mod
   integer, dimension(6)       :: dimids, dimidsn
   integer, dimension(5)       :: depdimids, depdimidsn
   real,parameter :: eps=nxmax/3.e5
+
+  integer, dimension(maxspec) :: hmix_specID, hmix_specIDn ! by ZW
 
 !  private:: writemetadata, output_units, nf90_err
 
@@ -265,6 +269,7 @@ subroutine writeheader_netcdf(lnest)
   integer                     :: i,ix,jy
   integer                     :: test_unit
 
+  integer :: hmix_sID ! by ZW
 
   ! Check if output directory exists (the netcdf library will
   ! otherwise give an error which can look confusing). 
@@ -501,6 +506,27 @@ subroutine writeheader_netcdf(lnest)
         else
            specID(i) = sID
         endif
+
+        ! To print concentration within mixing height, added by ZW
+        ! -------------------- start --------------------
+        call nf90_err(nf90_def_var(ncid,'spec'//anspec//'_mr_hmix', nf90_float, depdIDs, hmix_sID , &
+             deflate_level = deflate_level,  &
+             chunksizes = dep_chunksizes ))
+        call nf90_err(nf90_put_att(ncid, hmix_sID, 'units', units))
+        call nf90_err(nf90_put_att(ncid, hmix_sID, 'long_name', species(i)))
+        call nf90_err(nf90_put_att(ncid, hmix_sID, 'decay', decay(i)))
+        call nf90_err(nf90_put_att(ncid, hmix_sID, 'weightmolar', weightmolar(i)))
+!        call nf90_err(nf90_put_att(ncid, sID, 'ohreact', ohreact(i)))
+        call nf90_err(nf90_put_att(ncid, hmix_sID, 'ohcconst', ohcconst(i)))
+        call nf90_err(nf90_put_att(ncid, hmix_sID, 'ohdconst', ohdconst(i)))
+        call nf90_err(nf90_put_att(ncid, hmix_sID, 'vsetaver', vsetaver(i)))
+
+        if (lnest) then
+          hmix_specIDn(i) = hmix_sID
+        else
+          hmix_specID(i) = hmix_sID
+        endif
+        ! -------------------- end --------------------
      endif
 
      ! mixing ratio output
@@ -1003,7 +1029,37 @@ subroutine concoutput_netcdf(itime,outnum,gridtotalunc,wetgridtotalunc,drygridto
           call nf90_err(nf90_put_var(ncid,specID(ks),grid(0:numxgrid-1,0:numygrid-1,&
              1:numzgrid)*factor3d(0:numxgrid-1,0:numygrid-1,1:numzgrid)/tot_mu(ks,kp),&
                (/ 1,1,1,tpointer,kp,nage /), (/ numxgrid,numygrid,numzgrid,1,1,1 /) ))
- 
+
+          ! To print concentration within mixing height, added by ZW
+          ! -------------------- start --------------------
+          conc_3d(0:numxgrid-1,0:numygrid-1,&
+          1:numzgrid) = grid(0:numxgrid-1,0:numygrid-1,&
+          1:numzgrid)*factor3d(0:numxgrid-1,0:numygrid-1,1:numzgrid)/tot_mu(ks,kp)
+
+          do jy=0,numygrid-1
+            do ix=0,numxgrid-1
+              do kzz=2,numzgrid
+            
+                if ((height(kzz-1).lt.hmix(ix,jy,1,memind(2))).and. &
+                     (height(kzz).gt.hmix(ix,jy,1,memind(2)))) then
+    
+                      dz1=hmix(ix,jy,1,memind(2))-height(kzz-1)
+                      dz2=height(kzz)-hmix(ix,jy,1,memind(2))
+                      dz=dz1+dz2
+                      conc_2d(ix,jy) = conc_2d(ix,jy) + conc_3d(ix,jy,kzz)*dz1/dz
+
+                    exit
+                end if
+                conc_2d(ix,jy) = conc_2d(ix,jy) + conc_3d(ix,jy,kzz-1)
+
+              end do
+            end do
+          end do
+
+          call nf90_err(nf90_put_var(ncid,hmix_specID(ks),conc_2d,&
+            (/ 1,1,tpointer,kp,nage /), (/ numxgrid,numygrid,1,1,1 /) ))
+
+          ! -------------------- end --------------------
         endif !  concentration output
 
         ! Mixing ratio output

@@ -251,6 +251,17 @@ subroutine outgrid_init
   allocate(densityoutgrid(0:max(numxgrid,numxgridn)-1, &
        0:max(numygrid,numygridn)-1,numzgrid),stat=stat)
     if (stat.ne.0) write(*,*)'ERROR: could not allocate gridunc'
+
+  ! To print concentration within mixing height, added by ZW
+  ! -------------------- start --------------------
+  allocate(conc_3d(0:max(numxgrid,numxgridn)-1, &
+    0:max(numygrid,numygridn)-1,numzgrid),stat=stat)
+  if (stat.ne.0) write(*,*)'ERROR: could not allocate conc_3d'
+  allocate(conc_2d(0:max(numxgrid,numxgridn)-1, &
+    0:max(numygrid,numygridn)-1),stat=stat)
+  if (stat.ne.0) write(*,*)'ERROR: could not allocate conc_2d'
+  ! -------------------- end --------------------
+  
 ! RLT
   allocate(densitydrygrid(0:max(numxgrid,numxgridn)-1, &
        0:max(numygrid,numygridn)-1,numzgrid),stat=stat)
