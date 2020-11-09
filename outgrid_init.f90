@@ -254,9 +254,12 @@ subroutine outgrid_init
 
   ! To print concentration within mixing height, added by ZW
   ! -------------------- start --------------------
-  allocate(conc_3d(0:max(numxgrid,numxgridn)-1, &
+  allocate(conc_3d_byz(0:max(numxgrid,numxgridn)-1, &
     0:max(numygrid,numygridn)-1,numzgrid),stat=stat)
-  if (stat.ne.0) write(*,*)'ERROR: could not allocate conc_3d'
+  if (stat.ne.0) write(*,*)'ERROR: could not allocate conc_3d_byz'
+  allocate(conc_2d_lasttime(0:max(numxgrid,numxgridn)-1, &
+    0:max(numygrid,numygridn)-1),stat=stat)
+  if (stat.ne.0) write(*,*)'ERROR: could not allocate conc_2d_lasttime'
   allocate(conc_2d(0:max(numxgrid,numxgridn)-1, &
     0:max(numygrid,numygridn)-1),stat=stat)
   if (stat.ne.0) write(*,*)'ERROR: could not allocate conc_2d'
