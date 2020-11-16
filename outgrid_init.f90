@@ -257,12 +257,19 @@ subroutine outgrid_init
   allocate(conc_3d_byz(0:max(numxgrid,numxgridn)-1, &
     0:max(numygrid,numygridn)-1,numzgrid),stat=stat)
   if (stat.ne.0) write(*,*)'ERROR: could not allocate conc_3d_byz'
+  conc_3d_byz(:,:,:) = 0
   allocate(conc_2d_lasttime(0:max(numxgrid,numxgridn)-1, &
     0:max(numygrid,numygridn)-1),stat=stat)
   if (stat.ne.0) write(*,*)'ERROR: could not allocate conc_2d_lasttime'
+  conc_2d_lasttime(:,:) = 0
+  allocate(conc_2d_lasttime_allrelease(0:max(numxgrid,numxgridn)-1, &
+    0:max(numygrid,numygridn)-1),stat=stat)
+  if (stat.ne.0) write(*,*)'ERROR: could not allocate conc_2d_lasttime_allrelease'
+  conc_2d_lasttime_allrelease(:,:) = 0
   allocate(conc_2d(0:max(numxgrid,numxgridn)-1, &
     0:max(numygrid,numygridn)-1),stat=stat)
   if (stat.ne.0) write(*,*)'ERROR: could not allocate conc_2d'
+  conc_2d(:,:) = 0
   ! -------------------- end --------------------
   
 ! RLT

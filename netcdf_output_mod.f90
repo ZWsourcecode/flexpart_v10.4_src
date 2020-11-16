@@ -36,7 +36,7 @@ module netcdf_output_mod
   use outg_mod,  only: outheight,oroout,densityoutgrid,factor3d,volume,&
                        wetgrid,wetgridsigma,drygrid,drygridsigma,grid,gridsigma,&
                        area,arean,volumen, orooutn, &
-                       conc_2d, conc_3d_byz, conc_2d_lasttime ! by ZW
+                       conc_2d, conc_3d_byz, conc_2d_lasttime, conc_2d_lasttime_allrelease ! by ZW
   use par_mod,   only: dep_prec, sp, dp, maxspec, maxreceptor, nclassunc,&
                        unitoutrecept,unitoutreceptppt, nxmax,unittmp
   use com_mod,   only: path,length,ldirect,ibdate,ibtime,iedate,ietime, &
@@ -87,7 +87,10 @@ module netcdf_output_mod
   integer, dimension(5)       :: depdimids, depdimidsn
   real,parameter :: eps=nxmax/3.e5
 
+  integer, dimension(3)       :: dimids_3d, dimidsn_3d ! by ZW
+  integer, dimension(4)       :: dimids_4d, dimidsn_4d ! by ZW
   integer, dimension(maxspec) :: hmix_specID, hmix_specIDn, hmix_acc_specID, hmix_acc_specIDn ! by ZW
+  integer, dimension(maxspec) :: hmix_AllReleasePerTime_specID, hmix_AllReleasePerTime_specIDn ! by ZW
 
 !  private:: writemetadata, output_units, nf90_err
 
@@ -269,7 +272,9 @@ subroutine writeheader_netcdf(lnest)
   integer                     :: i,ix,jy
   integer                     :: test_unit
 
-  integer :: hmix_sID, hmix_acc_sID ! by ZW
+  integer :: hmix_sID, hmix_acc_sID, hmix_AllReleasePerTime_sID  ! by ZW
+  integer, dimension(3)       :: dIDs_3d, chunksizes_3d ! by ZW
+  integer, dimension(4)       :: dIDs_4d, chunksizes_4d ! by ZW
 
   ! Check if output directory exists (the netcdf library will
   ! otherwise give an error which can look confusing). 
@@ -484,6 +489,21 @@ subroutine writeheader_netcdf(lnest)
   chunksizes = (/ nnx, nny, numzgrid, 1, 1, 1 /)
   dep_chunksizes = (/ nnx, nny, 1, 1, 1 /)
 
+  ! To print concentration within mixing height, added by ZW
+  ! -------------------- start --------------------
+  dIDs_3d = (/ londimid, latdimid, timedimid /) 
+  dIDs_4d = (/ londimid, latdimid, pointspecdimid, timedimid /) 
+  if (lnest) then
+      dimidsn_3d = dIDs_3d
+      dimidsn_4d = dIDs_4d
+  else
+      dimids_3d = dIDs_3d
+      dimids_4d = dIDs_4d
+  endif
+  chunksizes_3d = (/ nnx, nny, 1  /) 
+  chunksizes_4d = (/ nnx, nny, 1, 1 /) 
+  ! -------------------- end --------------------
+
   do i = 1,nspec
      write(anspec,'(i3.3)') i
 
@@ -509,9 +529,9 @@ subroutine writeheader_netcdf(lnest)
 
         ! To print concentration within mixing height, added by ZW
         ! -------------------- start --------------------
-        call nf90_err(nf90_def_var(ncid,'spec'//anspec//'_mr_hmix', nf90_float, depdIDs, hmix_sID , &
+        call nf90_err(nf90_def_var(ncid,'spec'//anspec//'_mr_hmix', nf90_float, dIDs_4d, hmix_sID , &
              deflate_level = deflate_level,  &
-             chunksizes = dep_chunksizes ))
+             chunksizes = chunksizes_4d ))
         call nf90_err(nf90_put_att(ncid, hmix_sID, 'units', units))
         call nf90_err(nf90_put_att(ncid, hmix_sID, 'long_name', species(i)))
         call nf90_err(nf90_put_att(ncid, hmix_sID, 'decay', decay(i)))
@@ -527,9 +547,30 @@ subroutine writeheader_netcdf(lnest)
           hmix_specID(i) = hmix_sID
         endif
 
-        call nf90_err(nf90_def_var(ncid,'spec'//anspec//'_mr_hmix_acc', nf90_float, depdIDs, hmix_acc_sID , &
+
+        call nf90_err(nf90_def_var(ncid,'spec'//anspec//'_mr_hmix_ARPT', nf90_float, dIDs_3d, &
+              hmix_AllReleasePerTime_sID , &
+              deflate_level = deflate_level,  &
+              chunksizes = chunksizes_3d ))
+        call nf90_err(nf90_put_att(ncid, hmix_AllReleasePerTime_sID, 'units', units))
+        call nf90_err(nf90_put_att(ncid, hmix_AllReleasePerTime_sID, 'long_name', species(i)))
+        call nf90_err(nf90_put_att(ncid, hmix_AllReleasePerTime_sID, 'decay', decay(i)))
+        call nf90_err(nf90_put_att(ncid, hmix_AllReleasePerTime_sID, 'weightmolar', weightmolar(i)))
+      !        call nf90_err(nf90_put_att(ncid, sID, 'ohreact', ohreact(i)))
+        call nf90_err(nf90_put_att(ncid, hmix_AllReleasePerTime_sID, 'ohcconst', ohcconst(i)))
+        call nf90_err(nf90_put_att(ncid, hmix_AllReleasePerTime_sID, 'ohdconst', ohdconst(i)))
+        call nf90_err(nf90_put_att(ncid, hmix_AllReleasePerTime_sID, 'vsetaver', vsetaver(i)))
+
+        if (lnest) then
+          hmix_AllReleasePerTime_specIDn(i) = hmix_AllReleasePerTime_sID
+        else
+          hmix_AllReleasePerTime_specID(i) = hmix_AllReleasePerTime_sID
+        endif
+
+        call nf90_err(nf90_def_var(ncid,'spec'//anspec//'_mr_hmix_acc', nf90_float, (/ lonDimID, latDimID /), &
+             hmix_acc_sID , &
              deflate_level = deflate_level,  &
-             chunksizes = dep_chunksizes ))
+             chunksizes = (/ nnx, nny /) ))
         call nf90_err(nf90_put_att(ncid, hmix_acc_sID, 'units', units))
         call nf90_err(nf90_put_att(ncid, hmix_acc_sID, 'long_name', species(i)))
         call nf90_err(nf90_put_att(ncid, hmix_acc_sID, 'decay', decay(i)))
@@ -1044,9 +1085,9 @@ subroutine concoutput_netcdf(itime,outnum,gridtotalunc,wetgridtotalunc,drygridto
           endif
 
           ! Concentrations
-          call nf90_err(nf90_put_var(ncid,specID(ks),grid(0:numxgrid-1,0:numygrid-1,&
-             1:numzgrid)*factor3d(0:numxgrid-1,0:numygrid-1,1:numzgrid)/tot_mu(ks,kp),&
-               (/ 1,1,1,tpointer,kp,nage /), (/ numxgrid,numygrid,numzgrid,1,1,1 /) ))
+          ! call nf90_err(nf90_put_var(ncid,specID(ks),grid(0:numxgrid-1,0:numygrid-1,&
+          !    1:numzgrid)*factor3d(0:numxgrid-1,0:numygrid-1,1:numzgrid)/tot_mu(ks,kp),&
+          !      (/ 1,1,1,tpointer,kp,nage /), (/ numxgrid,numygrid,numzgrid,1,1,1 /) ))
 
           ! To print concentration within mixing height, added by ZW
           ! -------------------- start --------------------
@@ -1075,15 +1116,15 @@ subroutine concoutput_netcdf(itime,outnum,gridtotalunc,wetgridtotalunc,drygridto
           end do
 
           call nf90_err(nf90_put_var(ncid,hmix_acc_specID(ks),conc_2d,&
-            (/ 1,1,1,kp,nage /), (/ numxgrid,numygrid,1,1,1 /) ))
+            (/ 1,1 /), (/ numxgrid,numygrid /) ))
           
           if (tpointer.eq.1) then
             call nf90_err(nf90_put_var(ncid,hmix_specID(ks),conc_2d,&
-            (/ 1,1,tpointer,kp,nage /), (/ numxgrid,numygrid,1,1,1 /) ))
+            (/ 1,1,kp,tpointer /), (/ numxgrid,numygrid,1,1 /) ))
             conc_2d_lasttime = conc_2d
           else
             call nf90_err(nf90_put_var(ncid,hmix_specID(ks),conc_2d-conc_2d_lasttime,&
-            (/ 1,1,tpointer,kp,nage /), (/ numxgrid,numygrid,1,1,1 /) ))
+            (/ 1,1,kp,tpointer /), (/ numxgrid,numygrid,1,1 /) ))
             conc_2d_lasttime = conc_2d
           endif
           
@@ -1121,6 +1162,16 @@ subroutine concoutput_netcdf(itime,outnum,gridtotalunc,wetgridtotalunc,drygridto
 
       end do
     end do
+
+    if (tpointer.eq.1) then
+      call nf90_err(nf90_put_var(ncid,hmix_AllReleasePerTime_specID(ks),conc_2d,&
+      (/ 1,1,tpointer /), (/ numxgrid,numygrid,1 /) ))
+      conc_2d_lasttime_allrelease = conc_2d
+    else
+      call nf90_err(nf90_put_var(ncid,hmix_AllReleasePerTime_specID(ks),conc_2d-conc_2d_lasttime_allrelease,&
+      (/ 1,1,tpointer /), (/ numxgrid,numygrid,1 /) ))
+      conc_2d_lasttime_allrelease = conc_2d
+    endif
 
   end do
 

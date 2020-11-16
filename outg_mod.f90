@@ -34,7 +34,7 @@ module outg_mod
   ! To print concentration within mixing height, added by ZW
   ! -------------------- start --------------------
   real,allocatable, dimension (:,:,:) :: conc_3d_byz
-  real,allocatable, dimension (:,:) :: conc_2d_lasttime
+  real,allocatable, dimension (:,:) :: conc_2d_lasttime, conc_2d_lasttime_allrelease
   real,allocatable, dimension (:,:) :: conc_2d
   ! -------------------- end --------------------
 end module outg_mod
